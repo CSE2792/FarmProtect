@@ -24,4 +24,3 @@ dist-ssr
 *.sw?
 ml/data
 ml/pycache
-ml/waterlogging_unet.pth
