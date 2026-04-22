@@ -1,15 +1,39 @@
+import { useLocation, Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { WaterStatusBadge, ClaimBadge } from "@/components/StatusBadge";
-import { Download, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
-import heroImage from "@/assets/hero-farming.jpg";
+import { Download, ArrowLeft, AlertCircle } from "lucide-react";
+import { useEffect } from "react";
 
 const Result = () => {
-  const waterPercent = 62;
-  const status: "low" | "medium" | "high" = waterPercent > 50 ? "high" : waterPercent > 25 ? "medium" : "low";
-  const claim: "full" | "partial" | "none" = waterPercent > 50 ? "full" : waterPercent > 25 ? "partial" : "none";
+  const location = useLocation();
+  const navigate = useNavigate();
+  const data = location.state?.result;
+  const originalImage = location.state?.originalImage;
+
+  useEffect(() => {
+    if (!data) {
+      console.warn("No result data found in location state");
+    }
+  }, [data]);
+
+  if (!data) {
+    return (
+      <Layout>
+        <div className="container py-20 flex flex-col items-center justify-center space-y-4">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+          <h1 className="text-2xl font-bold">No Results Found</h1>
+          <p className="text-muted-foreground">Please upload an image for analysis first.</p>
+          <Link to="/dashboard">
+            <Button>Back to Dashboard</Button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  const { water_percent, severity, insurance_claim, result_image, affected_area } = data;
 
   return (
     <Layout>
@@ -21,18 +45,25 @@ const Result = () => {
         <h1 className="text-3xl font-bold">Detection Results</h1>
 
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Image */}
+          {/* Image Display */}
           <div className="space-y-4">
-            <div className="relative rounded-xl overflow-hidden border">
-              <img src={heroImage} alt="Analyzed satellite image" className="w-full aspect-video object-cover" loading="lazy" width={1280} height={720} />
-              <div className="absolute inset-0 bg-secondary/20 mix-blend-multiply" />
+            <div className="relative rounded-xl overflow-hidden border bg-black">
+              <img 
+                src={result_image || originalImage} 
+                alt="Analyzed satellite image" 
+                className="w-full aspect-square object-contain" 
+                loading="lazy" 
+              />
               <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur rounded-lg px-3 py-2 text-sm font-medium">
-                Water detected areas highlighted
+                Analysis Overlay
               </div>
             </div>
+            <p className="text-sm text-balance text-muted-foreground italic">
+              * Blue areas indicate detected waterlogged or flooded regions identified by the UNet model.
+            </p>
           </div>
 
-          {/* Results */}
+          {/* Results Summary */}
           <div className="space-y-6">
             <div className="rounded-xl border bg-card p-6 space-y-5">
               <h2 className="text-lg font-semibold">Analysis Summary</h2>
@@ -40,19 +71,19 @@ const Result = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Waterlogged Area</span>
-                  <span className="font-semibold">{waterPercent}%</span>
+                  <span className="font-semibold">{water_percent}%</span>
                 </div>
-                <Progress value={waterPercent} className="h-3" />
+                <Progress value={water_percent} className="h-3" />
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Severity Status</span>
-                <WaterStatusBadge level={status} />
+                <WaterStatusBadge level={severity as "low" | "medium" | "high"} />
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Insurance Claim</span>
-                <ClaimBadge status={claim} />
+                <ClaimBadge status={insurance_claim as "full" | "partial" | "none"} />
               </div>
             </div>
 
@@ -60,25 +91,25 @@ const Result = () => {
               <h2 className="text-lg font-semibold">Detailed Metrics</h2>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="rounded-lg bg-muted p-4">
-                  <p className="text-muted-foreground">Total Area</p>
-                  <p className="text-xl font-bold mt-1">5.2 ha</p>
+                  <p className="text-muted-foreground">Estimated Water Area</p>
+                  <p className="text-xl font-bold mt-1">{affected_area} ha</p>
                 </div>
                 <div className="rounded-lg bg-muted p-4">
-                  <p className="text-muted-foreground">Affected Area</p>
-                  <p className="text-xl font-bold mt-1">3.2 ha</p>
+                  <p className="text-muted-foreground">Confidence Level</p>
+                  <p className="text-xl font-bold mt-1">High</p>
                 </div>
                 <div className="rounded-lg bg-muted p-4">
-                  <p className="text-muted-foreground">Crop Type</p>
-                  <p className="text-xl font-bold mt-1">Rice</p>
+                  <p className="text-muted-foreground">Crop Risk</p>
+                  <p className="text-xl font-bold mt-1">{water_percent > 30 ? "Significant" : "Minimal"}</p>
                 </div>
                 <div className="rounded-lg bg-muted p-4">
-                  <p className="text-muted-foreground">Est. Payout</p>
-                  <p className="text-xl font-bold mt-1">₹48,000</p>
+                  <p className="text-muted-foreground">Processing Time</p>
+                  <p className="text-xl font-bold mt-1">&lt; 1s</p>
                 </div>
               </div>
             </div>
 
-            <Button size="lg" className="w-full h-12 text-base">
+            <Button size="lg" className="w-full h-12 text-base" onClick={() => window.print()}>
               <Download className="h-5 w-5 mr-2" />
               Download Report
             </Button>

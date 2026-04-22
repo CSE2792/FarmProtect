@@ -1,21 +1,17 @@
 import { Link, useLocation } from "react-router-dom";
-import { Droplets, Menu, X, LogOut } from "lucide-react";
+import { Droplets, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
-  const { user, signOut } = useAuth();
 
   const links = [
     { to: "/", label: "Home" },
     { to: "/about", label: "About" },
-    ...(user ? [
-      { to: "/dashboard", label: "Dashboard" },
-      { to: "/admin", label: "Admin" },
-    ] : []),
+    { to: "/dashboard", label: "Dashboard" },
+    { to: "/admin", label: "Admin" },
   ];
 
   return (
@@ -39,16 +35,6 @@ const Navbar = () => {
               {l.label}
             </Link>
           ))}
-          {user ? (
-            <Button size="lg" variant="outline" onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          ) : (
-            <Link to="/login">
-              <Button size="lg">Login</Button>
-            </Link>
-          )}
         </div>
 
         {/* Mobile toggle */}
@@ -70,16 +56,6 @@ const Navbar = () => {
               {l.label}
             </Link>
           ))}
-          {user ? (
-            <Button className="w-full" size="lg" variant="outline" onClick={() => { signOut(); setOpen(false); }}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          ) : (
-            <Link to="/login" onClick={() => setOpen(false)}>
-              <Button className="w-full" size="lg">Login</Button>
-            </Link>
-          )}
         </div>
       )}
     </nav>
