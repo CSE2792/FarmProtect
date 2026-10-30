@@ -21,7 +21,7 @@ const Login = () => {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -32,7 +32,7 @@ const Login = () => {
     if (error) {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else {
-      navigate("/dashboard");
+      navigate("/");
     }
   };
 
@@ -62,9 +62,10 @@ const Login = () => {
         <div className="text-center space-y-2">
           <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary">
             <Droplets className="h-7 w-7" />
-            AquaGuard
+            Farm Protect
           </Link>
-          <p className="text-muted-foreground">{isLogin ? "Sign in to your account" : "Create your account"}</p>
+          <p className="text-xl font-semibold mt-2">Farmer Login</p>
+          <p className="text-muted-foreground">{isLogin ? "Sign in to your farmer account" : "Create your farmer account"}</p>
         </div>
 
         <div className="rounded-xl border bg-card p-8 shadow-sm">

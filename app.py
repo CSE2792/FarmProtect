@@ -47,10 +47,111 @@ def deg2num(lat_deg, lon_deg, zoom):
     ytile = int((1.0 - math.log(math.tan(lat_rad) + (1.0 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
     return xtile, ytile
 
-def preprocess_image(image_bytes):
+def num2deg(xtile, ytile, zoom):
+    n = 2.0 ** zoom
+    lon_deg = xtile / n * 360.0 - 180.0
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
+    lat_deg = math.degrees(lat_rad)
+    return lat_deg, lon_deg
+
+def vegetation_score(image_bytes):
     # Convert bytes to numpy array
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        return -float('inf')
+    # OpenCV loads in BGR
+    b, g, r = img[:, :, 0].astype(float), img[:, :, 1].astype(float), img[:, :, 2].astype(float)
+    score = np.mean(g - 0.5 * r - 0.5 * b)
+    return score
+
+def generate_flood_mask(image, coverage=0.3):
+    np.random.seed(42)
+    h, w = image.shape[:2]
+    
+    # 1. Base random noise
+    noise = np.random.rand(max(1, h//4), max(1, w//4)).astype(np.float32)
+    noise = cv2.resize(noise, (w, h))
+    noise = cv2.GaussianBlur(noise, (101, 101), 0)
+    noise = (noise - noise.min()) / (noise.max() - noise.min() + 1e-5)
+    
+    # 2. Radial bias (center of image)
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - w/2)**2 + (Y - h/2)**2)
+    max_dist = np.sqrt((w/2)**2 + (h/2)**2)
+    radial_bias = 1.0 - (dist_from_center / (max_dist * 0.7))
+    radial_bias = np.clip(radial_bias, 0, 1)
+    
+    # 3. Vegetation bias (crop field areas)
+    b, g, r = image[:, :, 0].astype(float), image[:, :, 1].astype(float), image[:, :, 2].astype(float)
+    veg_score = g - 0.5 * r - 0.5 * b
+    veg_bias = np.clip(veg_score / 50.0, 0, 1)
+    
+    # Combine them (weight them)
+    combined = noise * 0.2 + radial_bias * 0.4 + veg_bias * 0.4
+    
+    # Threshold for coverage
+    threshold = np.percentile(combined, 100 * (1 - coverage))
+    mask = (combined > threshold).astype(np.uint8)
+    
+    return mask
+
+def apply_water_effect(image, mask):
+    overlay = image.copy().astype(np.float32)
+    # Light blue water color (BGR format)
+    water_color = np.array([230, 170, 100])  
+    for c in range(3):
+        overlay[:,:,c] = np.where(
+            mask == 1,
+            0.5 * overlay[:,:,c] + 0.5 * water_color[c], # Light blue blend
+            overlay[:,:,c]
+        )
+    return overlay.astype(np.uint8)
+
+def water_percentage(mask):
+    return (np.sum(mask) / mask.size) * 100
+
+def get_best_field_tile(lat, lon, zoom=17):
+    center_x, center_y = deg2num(lat, lon, zoom)
+    
+    best_score = -float('inf')
+    best_tile_bytes = None
+    best_coords = None
+    
+    # 3x3 grid
+    offsets = [-1, 0, 1]
+    
+    for dx in offsets:
+        for dy in offsets:
+            x = center_x + dx
+            y = center_y + dy
+            tile_url = f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{zoom}/{y}/{x}"
+            
+            try:
+                response = requests.get(tile_url, timeout=5)
+                if response.status_code == 200:
+                    score = vegetation_score(response.content)
+                    if score > best_score:
+                        best_score = score
+                        best_tile_bytes = response.content
+                        best_coords = (x, y)
+            except Exception:
+                continue
+                
+    if best_tile_bytes is None:
+        raise Exception("Failed to fetch any tiles in the grid.")
+        
+    return best_tile_bytes, best_coords
+
+def preprocess_image(image_bytes, simulate_flood=False):
+    # Convert bytes to numpy array
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    if simulate_flood:
+        mask = generate_flood_mask(img, coverage=0.3)
+        img = apply_water_effect(img, mask)
+
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
     # Resize to model input size
@@ -110,22 +211,13 @@ async def analyze(file: UploadFile = File(...)):
     }
 
 @app.get("/analyze-location")
-async def analyze_location(lat: float, lon: float, zoom: int = 16):
-    # Get tile coordinates
-    xtile, ytile = deg2num(lat, lon, zoom)
-    
-    # ESRI World Imagery Tile URL
-    tile_url = f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{zoom}/{ytile}/{xtile}"
-    
+async def analyze_location(lat: float, lon: float, zoom: int = 17, simulate: bool = False):
     try:
-        response = requests.get(tile_url, timeout=10)
-        response.raise_for_status()
-        contents = response.content
+        contents, (best_x, best_y) = get_best_field_tile(lat, lon, zoom)
     except Exception as e:
-        # Fallback or error
         return {"error": f"Failed to fetch satellite imagery: {str(e)}"}
 
-    input_tensor, original_rgb = preprocess_image(contents)
+    input_tensor, original_rgb = preprocess_image(contents, simulate_flood=simulate)
     
     with torch.no_grad():
         prediction = model(input_tensor)
@@ -162,6 +254,23 @@ async def analyze_location(lat: float, lon: float, zoom: int = 16):
         "lat": lat,
         "lon": lon
     }
+
+@app.get("/fetch-tile")
+async def fetch_tile(lat: float, lon: float, zoom: int = 17, simulate: bool = False):
+    try:
+        contents, (best_x, best_y) = get_best_field_tile(lat, lon, zoom)
+        
+        if simulate:
+            _, img_rgb = preprocess_image(contents, simulate_flood=True)
+            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            _, buffer = cv2.imencode('.jpg', img_bgr)
+            base64_img = base64.b64encode(buffer).decode('utf-8')
+        else:
+            base64_img = base64.b64encode(contents).decode('utf-8')
+            
+        return {"image": f"data:image/jpeg;base64,{base64_img}"}
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

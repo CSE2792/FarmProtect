@@ -13,6 +13,7 @@ const Result = () => {
   const originalImage = location.state?.originalImage;
 
   useEffect(() => {
+    window.scrollTo(100, 100);
     if (!data) {
       console.warn("No result data found in location state");
     }
@@ -48,11 +49,11 @@ const Result = () => {
           {/* Image Display */}
           <div className="space-y-4">
             <div className="relative rounded-xl overflow-hidden border bg-black">
-              <img 
-                src={result_image || originalImage} 
-                alt="Analyzed satellite image" 
-                className="w-full aspect-square object-contain" 
-                loading="lazy" 
+              <img
+                src={result_image || originalImage}
+                alt="Analyzed satellite image"
+                className="w-full aspect-square object-contain"
+                loading="lazy"
               />
               <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur rounded-lg px-3 py-2 text-sm font-medium">
                 Analysis Overlay

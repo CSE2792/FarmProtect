@@ -6,7 +6,7 @@ const Footer = () => (
       <div>
         <div className="flex items-center gap-2 font-bold text-lg text-primary mb-3">
           <Droplets className="h-5 w-5" />
-          AquaGuard
+          Farm Protect
         </div>
         <p className="text-sm text-muted-foreground">
           Automated water logging detection and smart insurance for farmers.
@@ -24,14 +24,14 @@ const Footer = () => (
       <div>
         <h4 className="font-semibold mb-3">Contact</h4>
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li>support@aquaguard.in</li>
-          <li>+91 1800 XXX XXXX</li>
+          <li>farmprotect@gov.in</li>
+          <li>+91 1800 180 1551</li>
           <li>Ministry of Agriculture, India</li>
         </ul>
       </div>
     </div>
     <div className="border-t py-4 text-center text-xs text-muted-foreground">
-      © 2026 AquaGuard. All rights reserved.
+      © 2026 Farm Protect. All rights reserved.
     </div>
   </footer>
 );

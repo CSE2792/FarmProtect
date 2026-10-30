@@ -5,7 +5,7 @@ const About = () => (
   <Layout>
     <section className="container py-16 md:py-24 max-w-3xl mx-auto space-y-10">
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold">About AquaGuard</h1>
+        <h1 className="text-4xl font-bold">About Farm Protect</h1>
         <p className="text-lg text-muted-foreground">
           A smart system to detect waterlogging in agricultural land using satellite imagery and automate insurance claim processing for farmers.
         </p>
